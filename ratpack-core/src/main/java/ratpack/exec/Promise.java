@@ -1546,6 +1546,54 @@ public interface Promise<T> {
   }
 
   /**
+   *
+   * When the returned promise is subscribed to, the given {@code promiseFactory} will be executed the resulting promise will execute.
+   * <pre class="java">{@code
+   * import com.google.common.collect.Lists;
+   * import ratpack.test.exec.ExecHarness;
+   * import ratpack.exec.Promise;
+   *
+   * import java.util.Arrays;
+   * import java.util.List;
+   *
+   * import static org.junit.Assert.assertEquals;
+   *
+   * public class Example {
+   *   public static void main(String... args) throws Exception {
+   *     List<String> events = Lists.newLinkedList();
+   *     ExecHarness.runSingle(c ->
+   *         Promise.<String>sync(() -> {
+   *           events.add("promise");
+   *           return "foo";
+   *         })
+   *         .flatten(() -> {
+   *              events.add("flattened promise");
+   *              return Promise.value("");
+   *         })
+   *         .then(v -> events.add("then"))
+   *     );
+   *     assertEquals(Arrays.asList("flattened promise", "promise", "then"), events);
+   *   }
+   * }
+   * }</pre>
+   *
+   * @param promiseFactory a promise to execute when the current promise is initiated
+   * @return effectively, {@code this} promise
+   * @since 1.5
+   */
+  default Promise<T> flatten(Factory<? extends Promise<T>> promiseFactory) {
+    return transform(up -> down -> {
+      try {
+        promiseFactory.create().then(Action.noop());
+      } catch (Throwable e) {
+        down.error(e);
+        return;
+      }
+      up.connect(down);
+    });
+  }
+
+  /**
    * Registers a listener for the promise outcome.
    * <pre class="java">{@code
    * import com.google.common.collect.Lists;
